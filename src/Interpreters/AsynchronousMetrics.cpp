@@ -239,33 +239,27 @@ void AsynchronousMetrics::update()
 #if defined(OS_LINUX)
     {
         IOMetrics::Data data = io_stat.get();
-        new_values["TotalTPS"] = data.tps_total;
-        new_values["AvgTPS"] = data.tps_avg;
-        new_values["TotalQueueSize"] = data.queue_size_total;
-        new_values["AvgQueueSize"] = data.queue_size_avg;
-        new_values["TotalUtilization"] = data.util_total;
-        new_values["AvgUtilization"] = data.util_avg;
-        new_values["AvgRead"] = data.read_avg;
-        new_values["TotalRead"] = data.read_total;
-        new_values["AvgWrite"] = data.write_avg;
-        new_values["TotalWrite"] = data.write_total;
-        
-        for (auto &it : data.dev_tps) {
-            String name = "TPSOn" + it.first;
-            new_values[name] = it.second;
-        }
-
-        for (auto &it : data.dev_queue_size) {
-            String name = "QueueSizeOn" + it.first;
-            new_values[name] = it.second;
-        }
-        for (auto &it : data.dev_read) {
-            String name = "ReadOn" + it.first;
-            new_values[name] = it.second;
-        }
-        for (auto &it : data.dev_write) {
-            String name = "WriteOn" + it.first;
-            new_values[name] = it.second;
+        for (auto &it : data.dev_stats)
+        {
+            auto x = it.second;
+            new_values["Complete read on " + it.first] = x.read_complete;
+            new_values["Complete write on " + it.first] = x.write_complete;
+            new_values["Complete discard on " + it.first] = x.discard_complete;
+            new_values["Merge read on " + it.first] = x.read_merge;
+            new_values["Merge write on " + it.first] = x.write_merge;
+            new_values["Merge discard on " + it.first] = x.discard_merge;
+            new_values["Sectors read on " + it.first] = x.read_sectors;
+            new_values["Sectors write on " + it.first] = x.write_sectors;
+            new_values["Sectors discard on " + it.first] = x.discard_sectors;
+            new_values["Time read on " + it.first] = x.read_time;
+            new_values["Time write on " + it.first] = x.write_time;
+            new_values["Time discard on " + it.first] = x.discard_time;
+            new_values["Read per sec on " + it.first] = x.read_per_sec;
+            new_values["Write per sec on " + it.first] = x.write_per_sec;
+            new_values["Discard per sec on " + it.first] = x.discard_per_sec;
+            new_values["Read queue size on " + it.first] = x.read_queue_size;
+            new_values["Write queue size on " + it.first] = x.write_queue_size;
+            new_values["Discard queue size on " + it.first] = x.discard_queue_size;
         }
     }
 #endif    

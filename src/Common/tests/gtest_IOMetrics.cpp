@@ -9,35 +9,29 @@ TEST(IOMetrics, SimpleTest)
     {
         DB::IOMetrics a;
         DB::IOMetrics::Data x = a.get();
-        std::cout << "Read\n";
-        std::cout << x.read_total << " " << x.read_avg << "\n";
-        for (auto &it : x.dev_read) 
+        for (auto &it : x.dev_stats) 
         {
-            std::cout << it.first << " " << it.second << "\n"; 
+            std::cout << it.first << "\n";
+            auto st = it.second;
+            std::cout << "Read complete : " << st.read_complete << "\n";
+            std::cout << "Read merge : " << st.read_merge << "\n";
+            std::cout << "Read sectors : " << st.read_sectors << "\n";
+            std::cout << "Read time : " << st.read_time << "\n";
+            std::cout << "Read per sec : " << st.read_per_sec << "\n";
+            std::cout << "Read queue size : " << st.read_queue_size << "\n";
+            std::cout << "Write complete : " << st.write_complete << "\n";
+            std::cout << "Write merge : " << st.write_merge << "\n";
+            std::cout << "Write sectors : " << st.write_sectors << "\n";
+            std::cout << "Write time : " << st.write_time << "\n";
+            std::cout << "Write per sec : " << st.write_per_sec << "\n";
+            std::cout << "Write queue size : " << st.write_queue_size << "\n";
+            std::cout << "Discard complete : " << st.discard_complete << "\n";
+            std::cout << "Discard merge : " << st.discard_merge << "\n";
+            std::cout << "Discard sectors : " << st.discard_sectors << "\n";
+            std::cout << "Discard time : " << st.discard_time << "\n";
+            std::cout << "Discard per sec : " << st.discard_per_sec << "\n";
+            std::cout << "Discard queue size : " << st.discard_queue_size << "\n";
         }
-        std::cout << "Write\n";
-        std::cout << x.write_total << " " << x.write_avg << "\n";
-        for (auto &it : x.dev_write) 
-        {
-            std::cout << it.first << " " << it.second << "\n"; 
-        }
-        std::cout << "Queue Size\n";
-        std::cout << x.queue_size_total << " " << x.queue_size_avg << "\n";
-        for (auto &it : x.dev_queue_size) 
-        {
-            std::cout << it.first << " " << it.second << "\n"; 
-        }
-        std::cout << "Util\n";
-        std::cout << x.util_total << " " << x.util_avg << "\n";
-        for (auto &it : x.dev_util) 
-        {
-            std::cout << it.first << " " << it.second << "\n"; 
-        }
-        std::cout << "TPS\n";
-        std::cout << x.tps_total << " " << x.tps_avg << "\n";
-        for (auto &it : x.dev_tps) 
-        {
-            std::cout << it.first << " " << it.second << "\n"; 
-        }        
+        std::cout << "\n";
     }
 } 

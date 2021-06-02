@@ -3,18 +3,30 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <cassert>
+#include <filesystem>
 
 #include "IOMetrics.h"
 
 #include <IO/ReadBufferFromMemory.h>
-#include <IO/ReadBufferFromString.h>
+#include <IO/ReadBufferFromFile.h>
 #include <IO/ReadHelpers.h>
 
 namespace DB
 {
 
-static constexpr auto command_traffic = "iostat -d";
-static constexpr auto command_util = "iostat -xd";
+namespace
+{
+    template<typename T>
+    void readIntAndSkipWhitespaceIfAny(T& x, ReadBuffer& buf) 
+    {
+        readIntText(x, buf);
+        skipWhitespaceIfAny(buf);
+    }
+}   
+
+String iostat_path = "/sys/block";
+
+static constexpr size_t READ_BUF_SIZE = 1 << 16;
 
 IOMetrics::IOMetrics() {}
 
@@ -22,113 +34,53 @@ IOMetrics::~IOMetrics() {}
 
 IOMetrics::Data IOMetrics::get() const
 {
-    Data data;
+    IOMetrics::Data data;
+
+    for (auto& it : std::filesystem::directory_iterator(iostat_path)) 
+    {
+        String filename = it.path().string() + "/stat";
+        String dev_name = it.path().string().substr(iostat_path.size(), it.path().string().size() - iostat_path.size());
+        ReadBufferFromFile buf(filename, READ_BUF_SIZE, O_RDONLY | O_CLOEXEC);
+
+        IOMetrics::Data::iostats cur;
+        
+        readIntAndSkipWhitespaceIfAny(cur.read_complete, buf);
+        readIntAndSkipWhitespaceIfAny(cur.read_merge, buf);
+        readIntAndSkipWhitespaceIfAny(cur.read_sectors, buf);
+        readIntAndSkipWhitespaceIfAny(cur.read_time, buf);
+        readIntAndSkipWhitespaceIfAny(cur.write_complete, buf);
+        readIntAndSkipWhitespaceIfAny(cur.write_merge, buf);
+        readIntAndSkipWhitespaceIfAny(cur.write_sectors, buf);
+        readIntAndSkipWhitespaceIfAny(cur.write_time, buf);
+        if (cur.read_time > 0)
+        {
+            cur.read_per_sec = static_cast<float>(cur.read_complete) / cur.read_time * 1000;
+            cur.read_queue_size = static_cast<float>(cur.read_merge - cur.read_complete) / cur.read_time * 1000;
+        }
+        if (cur.write_time > 0)
+        {
+            cur.write_per_sec = static_cast<float>(cur.write_complete) / cur.write_time * 1000;
+            cur.write_queue_size = static_cast<float>(cur.write_merge - cur.write_complete) / cur.write_time * 1000;
+        } 
+
+        uint32_t unused;
+        readIntAndSkipWhitespaceIfAny(unused, buf);
+        readIntAndSkipWhitespaceIfAny(unused, buf);
+        readIntAndSkipWhitespaceIfAny(unused, buf);
+
+        readIntAndSkipWhitespaceIfAny(cur.discard_complete, buf);
+        readIntAndSkipWhitespaceIfAny(cur.discard_merge, buf);
+        readIntAndSkipWhitespaceIfAny(cur.discard_sectors, buf);
+        readIntAndSkipWhitespaceIfAny(cur.discard_time, buf);
+        if (cur.discard_time > 0)
+        {
+            cur.discard_per_sec = static_cast<float>(cur.discard_complete) / cur.discard_time * 1000;
+            cur.discard_queue_size = static_cast<float>(cur.discard_merge - cur.discard_complete) / cur.discard_time * 1000;
+        }
+
+        data.dev_stats.push_back(std::make_pair(dev_name, cur));
+    }
     
-    char buffer[4096];
-    String cmd_output = "";
-    FILE* pipe = popen(String(command_traffic).c_str(), "r");
-    while (!feof(pipe))
-    {
-        if (fgets(buffer, 128, pipe))
-            cmd_output += buffer;
-    }
-    pclose(pipe);
-
-    ReadBufferFromString in(cmd_output);
-    String unused;
-    double ret;
-    int cnt = 0;
-    while (true) {
-        readString(unused, in);
-        if (unused.find("kB_dscd") != String::npos) 
-           break;
-       skipWhitespaceIfAny(in); 
-    }
-    while (true)
-    {
-        readStringUntilWhitespace(unused, in);        
-        if (unused == "")
-            break;
-        String device = unused;
-        while (device.back() == ' ' || device.back() == '\t') 
-            device.pop_back();
-        skipWhitespaceIfAny(in);
-        try
-        {
-            readFloatText(ret, in);
-        }
-        catch(...)
-        {
-            break;
-        }
-        data.tps_total += ret;
-        data.dev_tps.push_back({device, ret});
-        skipWhitespaceIfAny(in);
-        readFloatText(ret, in);
-        data.read_total += ret;
-        data.dev_read.push_back({device, ret});
-        skipWhitespaceIfAny(in);
-        readFloatText(ret, in);
-        data.write_total += ret;
-        data.dev_write.push_back({device, ret});
-        readString(unused, in); 
-        cnt++;
-    }
-    data.tps_avg = data.tps_total / cnt;
-    data.read_avg = data.read_total / cnt;
-    data.write_avg = data.write_total / cnt;
-    cmd_output = "";
-    pipe = popen(String(command_util).c_str(), "r");
-    while (!feof(pipe))
-    {
-        if (fgets(buffer, 128, pipe))
-            cmd_output += buffer;
-    }
-    pclose(pipe);
-
-    ReadBufferFromString in1(cmd_output);  
-    while (true) {
-        readString(unused, in1);
-        if (unused.find("util") != String::npos) 
-           break;
-       skipWhitespaceIfAny(in1); 
-    }
-    cnt = 0;
-    while (true) 
-    {
-        readStringUntilWhitespace(unused, in1);
-        if (unused == "")
-            break;
-        String device = unused;
-        skipWhitespaceIfAny(in1);
-        while (device.back() == ' ' || device.back() == '\t') 
-            device.pop_back();
-        for (int i = 0; i < 18; i++) 
-        {
-            try
-            {
-                readFloatText(ret, in1);
-            }
-            catch(...)
-            {
-                data.queue_size_avg = data.queue_size_total / cnt;
-                data.util_avg = data.util_total / cnt;
-                return data; 
-            }
-            skipWhitespaceIfAny(in1);
-        }
-        readFloatText(ret, in1);
-        data.queue_size_total += ret;
-        data.dev_queue_size.push_back({device, ret});
-        skipWhitespaceIfAny(in1);
-        readFloatText(ret, in1);
-        data.util_total += ret;
-        data.dev_util.push_back({device, ret});
-        cnt++;
-    }
-
-    data.queue_size_avg = data.queue_size_total / cnt;
-    data.util_avg = data.util_total / cnt;
     return data;
 }
 

@@ -12,30 +12,29 @@ public:
     
     struct Data
     {
-        float tps_total;
-        float tps_avg;
-        float queue_size_total;
-        float queue_size_avg;
-        float util_total;
-        float util_avg;
-        float read_avg;
-        float read_total;
-        float write_avg;
-        float write_total;
-        std::vector<std::pair<String, float>> dev_read;
-        std::vector<std::pair<String, float>> dev_write;
-        std::vector<std::pair<String, float>> dev_queue_size;
-        std::vector<std::pair<String, float>> dev_util;
-        std::vector<std::pair<String, float>> dev_tps;
-
-        Data()
+        struct iostats
         {
-            tps_avg = tps_total =
-            queue_size_avg = queue_size_total =  
-            util_avg = util_total = 
-            read_avg = read_total =
-            write_avg = write_total = 0;
-        }
+            uint64_t read_complete;
+            uint64_t read_merge;
+            uint64_t read_sectors;
+            uint64_t read_time;
+            float read_per_sec;
+            float read_queue_size;
+            uint64_t write_complete;
+            uint64_t write_merge;
+            uint64_t write_sectors;
+            uint64_t write_time;
+            float write_per_sec;
+            float write_queue_size;
+            uint64_t discard_complete;
+            uint64_t discard_merge;
+            uint64_t discard_sectors;
+            uint64_t discard_time;
+            float discard_per_sec;
+            float discard_queue_size;
+        };
+
+        std::vector<std::pair<String, iostats>> dev_stats;
     };
 
     IOMetrics();
